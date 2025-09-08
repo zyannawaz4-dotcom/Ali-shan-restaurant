@@ -21,6 +21,7 @@
   .actions { margin-top: 15px; text-align: center; }
   .actions button { padding: 10px 20px; margin: 5px; font-size: 16px; border-radius: 8px; cursor: pointer; }
   #report-box { white-space: pre-wrap; background:#fff; padding:10px; margin-top:15px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:none; }
+  #pdf-frame { width:100%; height:500px; border:1px solid #ccc; margin-top:15px; }
 </style>
 
 <script>
@@ -98,6 +99,7 @@ if ('serviceWorker' in navigator) {
 </div>
 
 <pre id="report-box"></pre>
+<iframe id="pdf-frame"></iframe>
 
 <script>
 let orderTotal = 0;
@@ -106,9 +108,6 @@ let orderCounts = { "Tikka":0, "Leg_Piece":0, "Kabab":0, "Kalagi":0, "Nan":0, "R
 
 // Load saved data
 window.onload = function() {
-  if(localStorage.getItem('pastOrders')) {
-    // pastOrders are permanent
-  }
   if(localStorage.getItem('orderCounts')) {
     orderCounts = JSON.parse(localStorage.getItem('orderCounts'));
     for(let key in orderCounts){
@@ -177,7 +176,7 @@ function resetAll(){
   saveData(); // pastOrders remain untouched
 }
 
-// Generate PDF report
+// Generate PDF report inside app
 function generateReport(){
   const doc = new jsPDF();
   const todayKey = new Date().toDateString();
@@ -185,20 +184,27 @@ function generateReport(){
   const reportData = pastOrders[todayKey] || [];
 
   let y = 10;
+  doc.setFontSize(16);
   doc.text('--- Daily Sales Report ---', 10, y);
   y += 10;
-  reportData.forEach((order,i)=>{
-    doc.text(`${i+1}. ${JSON.stringify(order)}`, 10, y);
-    y += 10;
-    if(y>280){ y=10; doc.addPage(); } // handle page overflow
-  });
 
-  const now = new Date();
-  const fileName = `${now.toLocaleString('en-US', { weekday: 'long' })} ${now.getDate()} ${now.getMonth()+1} ${now.getFullYear()}.pdf`;
-  doc.save(fileName);
+  doc.setFontSize(12);
+  if(reportData.length === 0){
+    doc.text('No orders yet for today.', 10, y);
+  } else {
+    reportData.forEach((order, i)=>{
+      doc.text(`${i+1}. ${JSON.stringify(order)}`, 10, y);
+      y += 10;
+      if(y > 280){ y = 10; doc.addPage(); }
+    });
+  }
 
-  document.getElementById("report-box").style.display="block";
-  document.getElementById("report-box").innerText = JSON.stringify(reportData,null,2);
+  const pdfBlob = doc.output('blob');
+  const pdfUrl = URL.createObjectURL(pdfBlob);
+  document.getElementById('pdf-frame').src = pdfUrl;
+
+  document.getElementById("report-box").style.display = "block";
+  document.getElementById("report-box").innerText = JSON.stringify(reportData, null, 2);
 }
 </script>
 
