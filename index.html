@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ali Shan Restaurant</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6366f1">
-
-<!-- jsPDF library -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.min.js"></script>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#6366f1" />
 
 <style>
   body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; }
@@ -21,17 +18,16 @@
   .actions { margin-top: 15px; text-align: center; }
   .actions button { padding: 10px 20px; margin: 5px; font-size: 16px; border-radius: 8px; cursor: pointer; }
   #report-box { white-space: pre-wrap; background:#fff; padding:10px; margin-top:15px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:none; }
-  #pdf-frame { width:100%; height:500px; border:1px solid #ccc; margin-top:15px; }
 </style>
 
 <script>
+// Register service worker if supported (keeps offline caching behavior)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js')
     .then(() => console.log('Service Worker Registered'))
     .catch(err => console.log('SW registration failed:', err));
 }
 </script>
-
 </head>
 <body>
 <h2>🍽️ Ali Shan Restaurant</h2>
@@ -99,24 +95,30 @@ if ('serviceWorker' in navigator) {
 </div>
 
 <pre id="report-box"></pre>
-<iframe id="pdf-frame"></iframe>
 
 <script>
+// app state
 let orderTotal = 0;
 let dailyTotal = 0;
 let orderCounts = { "Tikka":0, "Leg_Piece":0, "Kabab":0, "Kalagi":0, "Nan":0, "Roti":0 };
 
 // Load saved data
 window.onload = function() {
-  if(localStorage.getItem('orderCounts')) {
+  if (localStorage.getItem('orderCounts')) {
     orderCounts = JSON.parse(localStorage.getItem('orderCounts'));
-    for(let key in orderCounts){
-      document.getElementById(key+"-count").innerText = orderCounts[key];
+    for (let key in orderCounts) {
+      const el = document.getElementById(key + '-count');
+      if (el) el.innerText = orderCounts[key];
     }
   }
-  if(localStorage.getItem('dailyTotal')) dailyTotal = parseInt(localStorage.getItem('dailyTotal'));
-  document.getElementById("order-total").innerText = orderTotal;
-  document.getElementById("daily-total").innerText = dailyTotal;
+
+  if (localStorage.getItem('dailyTotal')) {
+    dailyTotal = parseInt(localStorage.getItem('dailyTotal'), 10) || 0;
+  }
+
+  // orderTotal is only for the current running order (not persisted)
+  document.getElementById('order-total').innerText = orderTotal;
+  document.getElementById('daily-total').innerText = dailyTotal;
 }
 
 function saveData() {
@@ -128,79 +130,82 @@ function saveData() {
 function addItem(item, price){
   orderCounts[item]++;
   orderTotal += price;
-  document.getElementById(item + "-count").innerText = orderCounts[item];
-  document.getElementById("order-total").innerText = orderTotal;
+  const countEl = document.getElementById(item + '-count');
+  if (countEl) countEl.innerText = orderCounts[item];
+  document.getElementById('order-total').innerText = orderTotal;
   saveData();
 }
 
 function removeItem(item, price){
-  if(orderCounts[item]>0){
+  if (orderCounts[item] > 0) {
     orderCounts[item]--;
     orderTotal -= price;
-    document.getElementById(item + "-count").innerText = orderCounts[item];
-    document.getElementById("order-total").innerText = orderTotal;
+    const countEl = document.getElementById(item + '-count');
+    if (countEl) countEl.innerText = orderCounts[item];
+    document.getElementById('order-total').innerText = orderTotal;
     saveData();
   }
 }
 
-// Complete Order: permanent
+// Complete Order: save into pastOrders
 function completeOrder(){
   const todayKey = new Date().toDateString();
   let pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
-  if(!pastOrders[todayKey]) pastOrders[todayKey] = [];
-  pastOrders[todayKey].push({...orderCounts, total: orderTotal});
+  if (!pastOrders[todayKey]) pastOrders[todayKey] = [];
+
+  // push a snapshot of the orderCounts plus total
+  pastOrders[todayKey].push({ ...orderCounts, total: orderTotal });
   localStorage.setItem('pastOrders', JSON.stringify(pastOrders));
 
+  // update daily total
   dailyTotal += orderTotal;
-  document.getElementById("daily-total").innerText = dailyTotal;
+  document.getElementById('daily-total').innerText = dailyTotal;
 
-  for(let key in orderCounts){
-    orderCounts[key]=0;
-    document.getElementById(key+"-count").innerText=0;
+  // reset current order counts and total
+  for (let key in orderCounts) {
+    orderCounts[key] = 0;
+    const el = document.getElementById(key + '-count');
+    if (el) el.innerText = 0;
   }
-  orderTotal=0;
-  document.getElementById("order-total").innerText=0;
+  orderTotal = 0;
+  document.getElementById('order-total').innerText = 0;
 
   saveData();
 }
 
-// Reset: start new day
+// Reset: start new day (pastOrders remain)
 function resetAll(){
-  for(let key in orderCounts) orderCounts[key]=0;
-  orderTotal=0;
-  dailyTotal=0;
-  document.getElementById("order-total").innerText=0;
-  document.getElementById("daily-total").innerText=0;
-  for(let key in orderCounts) document.getElementById(key+"-count").innerText=0;
-
+  for (let key in orderCounts) orderCounts[key] = 0;
+  orderTotal = 0;
+  dailyTotal = 0;
+  document.getElementById('order-total').innerText = 0;
+  document.getElementById('daily-total').innerText = 0;
+  for (let key in orderCounts) {
+    const el = document.getElementById(key + '-count');
+    if (el) el.innerText = 0;
+  }
   saveData(); // pastOrders remain untouched
 }
 
-// Generate text report instead of PDF
+// Generate text report (no PDF)
 function generateReport(){
   const todayKey = new Date().toDateString();
   const pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
   const reportData = pastOrders[todayKey] || [];
 
-  let reportText = "--- Daily Sales Report ---\n\n";
-
-  if(reportData.length === 0){
-    reportText += "No orders yet for today.\n";
+  let reportText = '--- Daily Sales Report ---\n\n';
+  if (reportData.length === 0) {
+    reportText += 'No orders yet for today.\n';
   } else {
     reportData.forEach((order, i) => {
       reportText += `${i+1}. ${JSON.stringify(order)}\n`;
     });
   }
 
-  // Show in report-box
-  document.getElementById("report-box").style.display = "block";
-  document.getElementById("report-box").innerText = reportText;
+  document.getElementById('report-box').style.display = 'block';
+  document.getElementById('report-box').innerText = reportText;
 }
-
-
 </script>
 
 </body>
 </html>
-
-
