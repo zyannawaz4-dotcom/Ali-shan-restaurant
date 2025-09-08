@@ -7,6 +7,9 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#6366f1">
 
+<!-- jsPDF library for PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
   body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; }
   h2 { text-align: center; }
@@ -44,9 +47,9 @@
   <div class="item">
     <img src="legpiece.jpg" alt="Leg Piece">
     <span>Leg Piece (150)</span>
-    <button onclick="addItem('Leg Piece',150)">+</button>
-    <button onclick="removeItem('Leg Piece',150)">-</button>
-    <span id="Leg Piece-count">0</span>
+    <button onclick="addItem('Leg_Piece',150)">+</button>
+    <button onclick="removeItem('Leg_Piece',150)">-</button>
+    <span id="Leg_Piece-count">0</span>
   </div>
 
   <div class="item">
@@ -90,71 +93,117 @@
   <!-- Buttons -->
   <div class="actions">
     <button onclick="completeOrder()">✅ Complete Order</button>
-    <button onclick="resetAll()">🔄 Reset All</button>
+    <button onclick="resetAll()">🔄 New Day</button>
     <button onclick="generateReport()">📄 Generate Report</button>
   </div>
 
   <!-- Report Box -->
   <pre id="report-box"></pre>
 
-  <script>
-    let orderTotal = 0;
-    let dailyTotal = 0;
+<script>
+let orderTotal = 0;
+let dailyTotal = 0;
+let orderCounts = { "Tikka":0, "Leg_Piece":0, "Kabab":0, "Kalagi":0, "Nan":0, "Roti":0 };
 
-    let orderCounts = { "Tikka":0, "Leg Piece":0, "Kabab":0, "Kalagi":0, "Nan":0, "Roti":0 };
-    let dailyCounts = { "Tikka":0, "Leg Piece":0, "Kabab":0, "Kalagi":0, "Nan":0, "Roti":0 };
-
-    function addItem(item, price) {
-      orderCounts[item]++;
-      orderTotal += price;
-      document.getElementById(item + "-count").innerText = orderCounts[item];
-      document.getElementById("order-total").innerText = orderTotal;
+// Load saved data
+window.onload = function() {
+  if(localStorage.getItem('dailyTotal')) dailyTotal = parseInt(localStorage.getItem('dailyTotal'));
+  if(localStorage.getItem('pastOrders')) {
+    // pastOrders are permanent, no deletion
+  }
+  if(localStorage.getItem('orderCounts')) {
+    orderCounts = JSON.parse(localStorage.getItem('orderCounts'));
+    for(let key in orderCounts){
+      document.getElementById(key+"-count").innerText = orderCounts[key];
     }
+  }
+  document.getElementById("order-total").innerText = orderTotal;
+  document.getElementById("daily-total").innerText = dailyTotal;
+}
 
-    function removeItem(item, price) {
-      if(orderCounts[item]>0){
-        orderCounts[item]--;
-        orderTotal -= price;
-        document.getElementById(item + "-count").innerText = orderCounts[item];
-        document.getElementById("order-total").innerText = orderTotal;
-      }
-    }
+// Save current order and daily total
+function saveData() {
+  localStorage.setItem('orderCounts', JSON.stringify(orderCounts));
+  localStorage.setItem('dailyTotal', dailyTotal);
+}
 
-    function completeOrder() {
-      dailyTotal += orderTotal;
-      document.getElementById("daily-total").innerText = dailyTotal;
+// Add / Remove item
+function addItem(item, price){
+  orderCounts[item]++;
+  orderTotal += price;
+  document.getElementById(item + "-count").innerText = orderCounts[item];
+  document.getElementById("order-total").innerText = orderTotal;
+  saveData();
+}
 
-      for(let key in orderCounts){
-        dailyCounts[key] += orderCounts[key];
-        orderCounts[key]=0;
-        document.getElementById(key+"-count").innerText=0;
-      }
-      orderTotal=0;
-      document.getElementById("order-total").innerText=0;
-    }
+function removeItem(item, price){
+  if(orderCounts[item]>0){
+    orderCounts[item]--;
+    orderTotal -= price;
+    document.getElementById(item + "-count").innerText = orderCounts[item];
+    document.getElementById("order-total").innerText = orderTotal;
+    saveData();
+  }
+}
 
-    function resetAll(){
-      orderTotal=0;
-      dailyTotal=0;
-      for(let key in orderCounts) orderCounts[key]=0;
-      for(let key in dailyCounts) dailyCounts[key]=0;
-      document.getElementById("order-total").innerText=0;
-      document.getElementById("daily-total").innerText=0;
-      for(let key in orderCounts) document.getElementById(key+"-count").innerText=0;
-      document.getElementById("report-box").style.display="none";
-    }
+// Complete Order: permanent
+function completeOrder(){
+  const todayKey = new Date().toDateString();
+  let pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
+  if(!pastOrders[todayKey]) pastOrders[todayKey] = [];
+  pastOrders[todayKey].push({...orderCounts, total: orderTotal});
+  localStorage.setItem('pastOrders', JSON.stringify(pastOrders));
 
-    function generateReport(){
-      let report="--- Daily Sales Report ---\n\n";
-      for(let key in dailyCounts){
-        report += `${key}: ${dailyCounts[key]} sold\n`;
-      }
-      report += `\nCurrent Order Total: ${orderTotal}\n`;
-      report += `Daily Sales Total: ${dailyTotal}`;
-      document.getElementById("report-box").style.display="block";
-      document.getElementById("report-box").innerText = report;
-    }
-  </script>
+  dailyTotal += orderTotal;
+  document.getElementById("daily-total").innerText = dailyTotal;
+
+  for(let key in orderCounts){
+    orderCounts[key]=0;
+    document.getElementById(key+"-count").innerText=0;
+  }
+  orderTotal=0;
+  document.getElementById("order-total").innerText=0;
+
+  saveData();
+}
+
+// Reset: starts new day, keeps past orders
+function resetAll(){
+  for(let key in orderCounts) orderCounts[key]=0;
+  orderTotal=0;
+  dailyTotal=0;
+  document.getElementById("order-total").innerText=0;
+  document.getElementById("daily-total").innerText=0;
+  for(let key in orderCounts) document.getElementById(key+"-count").innerText=0;
+
+  saveData(); // preserves pastOrders, only resets current order/daily total
+}
+
+// Generate PDF report
+function generateReport(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const todayKey = new Date().toDateString();
+  const pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
+  let reportData = pastOrders[todayKey] || [];
+
+  let y = 10;
+  doc.text(`--- Daily Sales Report ---`, 10, y);
+  y += 10;
+  reportData.forEach((order,i)=>{
+    doc.text(`${i+1}. ${JSON.stringify(order)}`, 10, y);
+    y += 10;
+  });
+
+  const now = new Date();
+  const fileName = `${now.toLocaleString('en-US', { weekday: 'long' })} ${now.getDate()} ${now.getMonth()+1} ${now.getFullYear()}.pdf`;
+  doc.save(fileName);
+
+  // Optionally, also show in report box
+  document.getElementById("report-box").style.display="block";
+  document.getElementById("report-box").innerText = JSON.stringify(reportData,null,2);
+}
+</script>
 
 </body>
 </html>
