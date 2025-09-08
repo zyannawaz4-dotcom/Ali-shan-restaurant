@@ -1,209 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ali Shan Restaurant</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6366f1">
+const cacheName = 'restaurant-sales-cache-v1';
+const assets = [
+  './',
+  './index.html',
+  './manifest.json',
+  './service-worker.js',
+  './tikka.jpg',
+  './legpiece.jpg',
+  './kabab.jpg',
+  './kalagi.jpg',
+  './nan.jpg',
+  './roti.jpg',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
+];
 
-<!-- jsPDF library for PDF generation -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+// Install SW and cache assets
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(cacheName).then(cache => cache.addAll(assets))
+  );
+});
 
-<style>
-  body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; }
-  h2 { text-align: center; }
-  .item { display: flex; align-items: center; justify-content: space-between; padding: 10px; margin: 10px 0; background: #fff; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-  .item img { width: 60px; height: 60px; object-fit: cover; border-radius: 0; margin-right: 10px; }
-  .item button { padding: 5px 10px; font-size: 14px; margin-left: 5px; }
-  .totals { margin-top: 20px; padding: 10px; background: #fff; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-  .totals h3 { margin: 10px 0; }
-  .actions { margin-top: 15px; text-align: center; }
-  .actions button { padding: 10px 20px; margin: 5px; font-size: 16px; border-radius: 8px; cursor: pointer; }
-  #report-box { white-space: pre-wrap; background:#fff; padding:10px; margin-top:15px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:none; }
-</style>
+// Activate: remove old caches
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => 
+      Promise.all(keys.filter(key => key !== cacheName).map(key => caches.delete(key)))
+    )
+  );
+});
 
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js')
-      .then(() => console.log('Service Worker Registered'))
-      .catch(err => console.log('SW registration failed:', err));
-  }
-</script>
-
-</head>
-<body>
-  <h2>🍽️ Ali Shan Restaurant</h2>
-
-  <!-- Menu Items -->
-  <div class="item">
-    <img src="tikka.jpg" alt="Tikka">
-    <span>Tikka (150)</span>
-    <button onclick="addItem('Tikka',150)">+</button>
-    <button onclick="removeItem('Tikka',150)">-</button>
-    <span id="Tikka-count">0</span>
-  </div>
-
-  <div class="item">
-    <img src="legpiece.jpg" alt="Leg Piece">
-    <span>Leg Piece (150)</span>
-    <button onclick="addItem('Leg_Piece',150)">+</button>
-    <button onclick="removeItem('Leg_Piece',150)">-</button>
-    <span id="Leg_Piece-count">0</span>
-  </div>
-
-  <div class="item">
-    <img src="kabab.jpg" alt="Kabab">
-    <span>Kabab (100)</span>
-    <button onclick="addItem('Kabab',100)">+</button>
-    <button onclick="removeItem('Kabab',100)">-</button>
-    <span id="Kabab-count">0</span>
-  </div>
-
-  <div class="item">
-    <img src="kalagi.jpg" alt="Kalagi">
-    <span>Kalagi (50)</span>
-    <button onclick="addItem('Kalagi',50)">+</button>
-    <button onclick="removeItem('Kalagi',50)">-</button>
-    <span id="Kalagi-count">0</span>
-  </div>
-
-  <div class="item">
-    <img src="nan.jpg" alt="Nan">
-    <span>Nan (25)</span>
-    <button onclick="addItem('Nan',25)">+</button>
-    <button onclick="removeItem('Nan',25)">-</button>
-    <span id="Nan-count">0</span>
-  </div>
-
-  <div class="item">
-    <img src="roti.jpg" alt="Roti">
-    <span>Roti (15)</span>
-    <button onclick="addItem('Roti',15)">+</button>
-    <button onclick="removeItem('Roti',15)">-</button>
-    <span id="Roti-count">0</span>
-  </div>
-
-  <!-- Totals -->
-  <div class="totals">
-    <h3>Current Order Total: <span id="order-total">0</span></h3>
-    <h3>Daily Sales Total: <span id="daily-total">0</span></h3>
-  </div>
-
-  <!-- Buttons -->
-  <div class="actions">
-    <button onclick="completeOrder()">✅ Complete Order</button>
-    <button onclick="resetAll()">🔄 New Day</button>
-    <button onclick="generateReport()">📄 Generate Report</button>
-  </div>
-
-  <!-- Report Box -->
-  <pre id="report-box"></pre>
-
-<script>
-let orderTotal = 0;
-let dailyTotal = 0;
-let orderCounts = { "Tikka":0, "Leg_Piece":0, "Kabab":0, "Kalagi":0, "Nan":0, "Roti":0 };
-
-// Load saved data
-window.onload = function() {
-  if(localStorage.getItem('dailyTotal')) dailyTotal = parseInt(localStorage.getItem('dailyTotal'));
-  if(localStorage.getItem('pastOrders')) {
-    // pastOrders are permanent, no deletion
-  }
-  if(localStorage.getItem('orderCounts')) {
-    orderCounts = JSON.parse(localStorage.getItem('orderCounts'));
-    for(let key in orderCounts){
-      document.getElementById(key+"-count").innerText = orderCounts[key];
-    }
-  }
-  document.getElementById("order-total").innerText = orderTotal;
-  document.getElementById("daily-total").innerText = dailyTotal;
-}
-
-// Save current order and daily total
-function saveData() {
-  localStorage.setItem('orderCounts', JSON.stringify(orderCounts));
-  localStorage.setItem('dailyTotal', dailyTotal);
-}
-
-// Add / Remove item
-function addItem(item, price){
-  orderCounts[item]++;
-  orderTotal += price;
-  document.getElementById(item + "-count").innerText = orderCounts[item];
-  document.getElementById("order-total").innerText = orderTotal;
-  saveData();
-}
-
-function removeItem(item, price){
-  if(orderCounts[item]>0){
-    orderCounts[item]--;
-    orderTotal -= price;
-    document.getElementById(item + "-count").innerText = orderCounts[item];
-    document.getElementById("order-total").innerText = orderTotal;
-    saveData();
-  }
-}
-
-// Complete Order: permanent
-function completeOrder(){
-  const todayKey = new Date().toDateString();
-  let pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
-  if(!pastOrders[todayKey]) pastOrders[todayKey] = [];
-  pastOrders[todayKey].push({...orderCounts, total: orderTotal});
-  localStorage.setItem('pastOrders', JSON.stringify(pastOrders));
-
-  dailyTotal += orderTotal;
-  document.getElementById("daily-total").innerText = dailyTotal;
-
-  for(let key in orderCounts){
-    orderCounts[key]=0;
-    document.getElementById(key+"-count").innerText=0;
-  }
-  orderTotal=0;
-  document.getElementById("order-total").innerText=0;
-
-  saveData();
-}
-
-// Reset: starts new day, keeps past orders
-function resetAll(){
-  for(let key in orderCounts) orderCounts[key]=0;
-  orderTotal=0;
-  dailyTotal=0;
-  document.getElementById("order-total").innerText=0;
-  document.getElementById("daily-total").innerText=0;
-  for(let key in orderCounts) document.getElementById(key+"-count").innerText=0;
-
-  saveData(); // preserves pastOrders, only resets current order/daily total
-}
-
-// Generate PDF report
-function generateReport(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const todayKey = new Date().toDateString();
-  const pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
-  let reportData = pastOrders[todayKey] || [];
-
-  let y = 10;
-  doc.text(`--- Daily Sales Report ---`, 10, y);
-  y += 10;
-  reportData.forEach((order,i)=>{
-    doc.text(`${i+1}. ${JSON.stringify(order)}`, 10, y);
-    y += 10;
-  });
-
-  const now = new Date();
-  const fileName = `${now.toLocaleString('en-US', { weekday: 'long' })} ${now.getDate()} ${now.getMonth()+1} ${now.getFullYear()}.pdf`;
-  doc.save(fileName);
-
-  // Optionally, also show in report box
-  document.getElementById("report-box").style.display="block";
-  document.getElementById("report-box").innerText = JSON.stringify(reportData,null,2);
-}
-</script>
-
-</body>
-</html>
+// Fetch from cache if offline
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request).then(res => res || fetch(event.request))
+  );
+});
