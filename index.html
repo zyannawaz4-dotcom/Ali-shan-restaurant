@@ -176,7 +176,7 @@ function resetAll(){
   saveData(); // pastOrders remain untouched
 }
 
-// Generate PDF report inside app
+// Generate PDF report inside app AND download
 function generateReport(){
   const doc = new jsPDF();
   const todayKey = new Date().toDateString();
@@ -199,14 +199,23 @@ function generateReport(){
     });
   }
 
+  // Show PDF inside iframe
   const pdfBlob = doc.output('blob');
   const pdfUrl = URL.createObjectURL(pdfBlob);
   document.getElementById('pdf-frame').src = pdfUrl;
 
+  // Trigger download
+  const now = new Date();
+  const fileName = `${now.toLocaleString('en-US', { weekday: 'long' })} ${now.getDate()} ${now.getMonth()+1} ${now.getFullYear()}.pdf`;
+  doc.save(fileName);
+
+  // Optional: show JSON report in text box
   document.getElementById("report-box").style.display = "block";
   document.getElementById("report-box").innerText = JSON.stringify(reportData, null, 2);
 }
+
 </script>
 
 </body>
 </html>
+
