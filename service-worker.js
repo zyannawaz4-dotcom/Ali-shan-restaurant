@@ -1,4 +1,4 @@
-const cacheName = 'restaurant-sales-cache-v1';
+const cacheName = 'restaurant-sales-cache-v2'; // updated version
 const assets = [
   './',
   './index.html',
@@ -11,7 +11,8 @@ const assets = [
   './nan.jpg',
   './roti.jpg',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.min.js' // cache jsPDF library
 ];
 
 // Install SW and cache assets
