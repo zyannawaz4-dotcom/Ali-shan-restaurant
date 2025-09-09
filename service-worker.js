@@ -37,3 +37,42 @@ self.addEventListener('fetch', event => {
     caches.match(event.request).then(res => res || fetch(event.request))
   );
 });
+
+const CACHE_NAME = "restaurant-cache-v1";
+const urlsToCache = [
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./tikka.jpg",
+  "./legpiece.jpg",
+  "./kabab.jpg",
+  "./kalagi.jpg",
+  "./nan.jpg",
+  "./roti.jpg"
+];
+
+self.addEventListener("install", event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(urlsToCache);
+    })
+  );
+});
+
+self.addEventListener("fetch", event => {
+  event.respondWith(
+    caches.match(event.request).then(response => {
+      return response || fetch(event.request);
+    })
+  );
+});
+
+self.addEventListener("activate", event => {
+  event.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      );
+    })
+  );
+});
