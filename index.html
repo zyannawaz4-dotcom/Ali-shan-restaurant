@@ -10,26 +10,21 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; }
     h2 { text-align: center; }
-    .item { display: flex; align-items: center; justify-content: space-between;
-            padding: 10px; margin: 10px 0; background: #fff;
-            border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .item { display: flex; align-items: center; justify-content: space-between; padding: 10px; margin: 10px 0; background: #fff; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .item img { width: 60px; height: 60px; object-fit: cover; margin-right: 10px; }
     .item button { padding: 5px 10px; font-size: 14px; margin-left: 5px; }
-    .totals { margin-top: 20px; padding: 10px; background: #fff;
-              border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .totals { margin-top: 20px; padding: 10px; background: #fff; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .totals h3 { margin: 10px 0; }
     .actions { margin-top: 15px; text-align: center; }
-    .actions button { padding: 10px 20px; margin: 5px; font-size: 16px;
-                      border-radius: 8px; cursor: pointer; }
-    #report-box { white-space: pre-wrap; background:#fff; padding:10px; margin-top:15px;
-                  border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:none; }
+    .actions button { padding: 10px 20px; margin: 5px; font-size: 16px; border-radius: 8px; cursor: pointer; }
+    #report-box { white-space: pre-wrap; background:#fff; padding:10px; margin-top:15px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:none; }
   </style>
 
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./service-worker.js')
-        .then(() => console.log('Service Worker Registered'))
-        .catch(err => console.log('SW registration failed:', err));
+        .then(() => console.log('✅ Service Worker Registered'))
+        .catch(err => console.log('❌ SW registration failed:', err));
     }
   </script>
 </head>
@@ -44,6 +39,7 @@
     <button onclick="removeItem('Tikka',150)">-</button>
     <span id="Tikka-count">0</span>
   </div>
+
   <div class="item">
     <img src="legpiece.jpg" alt="Leg Piece">
     <span>Leg Piece (150)</span>
@@ -51,6 +47,7 @@
     <button onclick="removeItem('Leg_Piece',150)">-</button>
     <span id="Leg_Piece-count">0</span>
   </div>
+
   <div class="item">
     <img src="kabab.jpg" alt="Kabab">
     <span>Kabab (100)</span>
@@ -58,6 +55,7 @@
     <button onclick="removeItem('Kabab',100)">-</button>
     <span id="Kabab-count">0</span>
   </div>
+
   <div class="item">
     <img src="kalagi.jpg" alt="Kalagi">
     <span>Kalagi (50)</span>
@@ -65,6 +63,7 @@
     <button onclick="removeItem('Kalagi',50)">-</button>
     <span id="Kalagi-count">0</span>
   </div>
+
   <div class="item">
     <img src="nan.jpg" alt="Nan">
     <span>Nan (25)</span>
@@ -72,6 +71,7 @@
     <button onclick="removeItem('Nan',25)">-</button>
     <span id="Nan-count">0</span>
   </div>
+
   <div class="item">
     <img src="roti.jpg" alt="Roti">
     <span>Roti (15)</span>
@@ -108,8 +108,7 @@
           document.getElementById(key+"-count").innerText = orderCounts[key];
         }
       }
-      if(localStorage.getItem('dailyTotal'))
-        dailyTotal = parseInt(localStorage.getItem('dailyTotal'));
+      if(localStorage.getItem('dailyTotal')) dailyTotal = parseInt(localStorage.getItem('dailyTotal'));
       document.getElementById("order-total").innerText = orderTotal;
       document.getElementById("daily-total").innerText = dailyTotal;
     }
@@ -119,6 +118,7 @@
       localStorage.setItem('dailyTotal', dailyTotal);
     }
 
+    // Add / Remove items
     function addItem(item, price){
       orderCounts[item]++;
       orderTotal += price;
@@ -137,6 +137,7 @@
       }
     }
 
+    // Complete Order: permanent
     function completeOrder(){
       const todayKey = new Date().toDateString();
       let pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
@@ -147,52 +148,62 @@
       dailyTotal += orderTotal;
       document.getElementById("daily-total").innerText = dailyTotal;
 
-      for(let key in orderCounts){ orderCounts[key]=0; document.getElementById(key+"-count").innerText=0; }
+      for(let key in orderCounts){
+        orderCounts[key]=0;
+        document.getElementById(key+"-count").innerText=0;
+      }
       orderTotal=0;
       document.getElementById("order-total").innerText=0;
+
       saveData();
     }
 
+    // Reset: start new day
     function resetAll(){
       for(let key in orderCounts) orderCounts[key]=0;
-      orderTotal=0; dailyTotal=0;
+      orderTotal=0;
+      dailyTotal=0;
       document.getElementById("order-total").innerText=0;
       document.getElementById("daily-total").innerText=0;
       for(let key in orderCounts) document.getElementById(key+"-count").innerText=0;
-      saveData();
+      saveData(); // pastOrders remain untouched
     }
 
-    // Generate report as text file
-    function generateReport(){
-      const todayKey = new Date().toDateString();
-      const pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
-      const reportData = pastOrders[todayKey] || [];
+    // <script>
+function generateReport(){
+  const todayKey = new Date().toDateString();
+  const pastOrders = JSON.parse(localStorage.getItem('pastOrders') || '{}');
+  const reportData = pastOrders[todayKey] || [];
 
-      let reportText = "--- Daily Sales Report ---\n\n";
-      if(reportData.length === 0){
-        reportText += "No orders yet for today.\n";
-      } else {
-        reportData.forEach((order, i) => {
-          reportText += `${i+1}. ${JSON.stringify(order)}\n`;
-        });
-      }
+  // Create text report
+  let reportText = "--- Daily Sales Report ---\n";
+  if(reportData.length === 0){
+    reportText += "No orders yet for today.\n";
+  } else {
+    reportData.forEach((order, i)=>{
+      reportText += `${i+1}. ${JSON.stringify(order)}\n`;
+    });
+  }
 
-      // Save as .txt file
-      const blob = new Blob([reportText], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      const now = new Date();
-      link.download = `Daily_Report_${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+  // 1. Show report in app
+  document.getElementById("report-box").style.display = "block";
+  document.getElementById("report-box").innerText = reportText;
 
-      // Show in app too
-      document.getElementById("report-box").style.display = "block";
-      document.getElementById("report-box").innerText = reportText;
-    }
+  // 2. Save as .txt file offline
+  const blob = new Blob([reportText], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+
+  const now = new Date();
+  const fileName = `Sales_Report_${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}.txt`;
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
   </script>
 </body>
 </html>
