@@ -1,9 +1,11 @@
-const cacheName = 'restaurant-sales-cache-v2'; // updated version
-const assets = [
+// service-worker.js
+const CACHE_NAME = 'restaurant-cache-v2';
+const RUNTIME_CACHE = 'restaurant-runtime-v1';
+
+const PRECACHE_URLS = [
   './',
   './index.html',
   './manifest.json',
-  './service-worker.js',
   './tikka.jpg',
   './legpiece.jpg',
   './kabab.jpg',
@@ -12,67 +14,64 @@ const assets = [
   './roti.jpg',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.min.js' // cache jsPDF library
+  './service-worker.js'
 ];
 
-// Install SW and cache assets
+// Install: pre-cache all app assets
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(cacheName).then(cache => cache.addAll(assets))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
   );
 });
 
-// Activate: remove old caches
+// Activate: clean up old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => 
-      Promise.all(keys.filter(key => key !== cacheName).map(key => caches.delete(key)))
-    )
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(k => k !== CACHE_NAME && k !== RUNTIME_CACHE)
+            .map(k => caches.delete(k))
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
-// Fetch from cache if offline
+// Fetch handler
 self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+
+  const req = event.request;
+
+  // For page navigations → network first, fallback to index.html
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then(res => res)
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // For other assets → cache first, fallback to network
   event.respondWith(
-    caches.match(event.request).then(res => res || fetch(event.request))
-  );
-});
+    caches.match(req).then(cached => {
+      if (cached) return cached;
 
-const CACHE_NAME = "restaurant-cache-v1";
-const urlsToCache = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./tikka.jpg",
-  "./legpiece.jpg",
-  "./kabab.jpg",
-  "./kalagi.jpg",
-  "./nan.jpg",
-  "./roti.jpg"
-];
-
-self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(urlsToCache);
-    })
-  );
-});
-
-self.addEventListener("fetch", event => {
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    })
-  );
-});
-
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-      );
+      return fetch(req)
+        .then(networkRes => {
+          if (!networkRes || networkRes.status !== 200) return networkRes;
+          return caches.open(RUNTIME_CACHE).then(cache => {
+            cache.put(req, networkRes.clone());
+            return networkRes;
+          });
+        })
+        .catch(() => {
+          // Fallback for images if offline
+          if (req.destination === 'image') {
+            return caches.match('./icons/icon-192.png');
+          }
+        });
     })
   );
 });
